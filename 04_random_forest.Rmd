@@ -1,0 +1,162 @@
+---
+title: "Random forest predictions"
+output:
+  html_document:
+    theme: spacelab
+    highlight: tango
+---
+
+```{r, echo = F}
+knitr::opts_chunk$set(echo = T)
+```
+
+```{r}
+# directories
+root   <- paste0("C:/Users/", Sys.getenv("USERNAME"), "/Projects/portugal")
+
+fn     <- file.path(root, "fn")
+in_csv <- file.path(root, "src", "final", "student.csv")
+
+# package declarations
+suppressPackageStartupMessages({
+  library(assertr)
+  library(dplyr)
+  library(ranger)
+  library(readr)
+  library(tidyr)
+})
+
+# options
+options(lifecycle_disable_warnings = T)
+options(dplyr.print_max = 100)
+set.seed(29813)
+
+# source functions
+invisible(sapply(list.files(fn, pattern = "\\.R", full.names = T), source))
+```
+
+
+```{r}
+# load data
+df <- readr::read_csv(in_csv, show_col_types = F) %>%
+      assertr::assert_rows(col_concat, is_uniq, subj, pseudo_id)
+
+# model preparation
+excl <- c("subj", "pseudo_id", "post_test", "post_test_gtp25", "post_test_gtp50", "post_test_gtp75")
+predictors <- names(df)[!(names(df) %in% c(excl))]
+
+outcomes <- c("post_test_gtp25", "post_test_gtp50", "post_test_gtp75")
+```
+
+
+```{r}
+# use reading exam scores as training set
+df.pred <- NULL
+models  <- list()
+
+seeds <- c(54622, 35685, 2323456)
+
+for (o in c(outcomes)) {
+
+  # model-specific data frame
+  df.est <-
+    df %>%
+    filter(subj=="por") %>%
+    drop_na(all_of(c(o))) %>%
+    drop_na(all_of(c(predictors))) %>%
+    mutate(!!sym(paste0(o,"_factor")) := as.factor(!!sym(o)==1))
+
+  # baseline accuracy
+  mu <- mean(df.est[[o]])
+
+  # random forest
+  seeds <- seeds[2:length(seeds)]
+
+  rf.fit <-
+    ranger::ranger(
+      as.formula(paste(paste0(o, "_factor"), "~", paste0(c(predictors), collapse = " + "))),
+      data      = df.est,
+      num.trees = 500,
+      mtry      = floor(sqrt(length(c(predictors)))),
+      replace   = T,
+      seed      = seeds[1])
+
+  models[[o]] <- rf.fit
+
+  print(rf.fit)
+
+  rf.rates <-
+    pred_rates(
+      prediction = as.numeric(as.logical(rf.fit$predictions)==T),
+      reference  = as.numeric(as.logical(df.est[[o]])==T))
+
+  df.pred <-
+    rbind(
+      df.pred,
+      tibble(
+         set     = "train",
+         y       = o,
+         mu      = mu,
+         rf_acc  = rf.rates$acc,
+         rf_sens = rf.rates$sens,
+         rf_spec = rf.rates$spec,
+         rf_prec = rf.rates$prec
+      )
+    )
+
+}
+```
+
+
+```{r}
+# use math exam scores as test set
+for (o in c(outcomes)) {
+
+  # model-specific data frame
+  df.est <-
+    df %>%
+    filter(subj=="mat") %>%
+    drop_na(all_of(c(o))) %>%
+    drop_na(all_of(c(predictors))) %>%
+    mutate(!!sym(paste0(o,"_factor")) := as.factor(!!sym(o)==1))
+
+  # baseline accuracy
+  mu <- mean(df.est[[o]])
+
+  # test model
+  rf.test <- ranger:::predict.ranger(models[[o]], data = df.est)
+
+  print(rf.test)
+
+  rf.rates <-
+    pred_rates(
+      prediction = as.numeric(as.logical(rf.test$predictions)==T),
+      reference  = as.numeric(as.logical(df.est[[o]])==T))
+
+  df.pred <-
+    rbind(
+      df.pred,
+      tibble(
+         set     = "test",
+         y       = o,
+         mu      = mu,
+         rf_acc  = rf.rates$acc,
+         rf_sens = rf.rates$sens,
+         rf_spec = rf.rates$spec,
+         rf_prec = rf.rates$prec
+      )
+    )
+
+}
+```
+
+
+```{r}
+# assess train/test performance
+df.pred
+
+
+# TO DO: add visualizations
+# TO DO: vary hyperparameters (especially mtry)
+# TO DO: cross-validated RF approach with only reading exam data
+```

@@ -1,9 +1,11 @@
 ---
-title: "Random forest predictions"
+title: "Predictive modeling"
 output:
   html_document:
     theme: spacelab
     highlight: tango
+    mathjax: default
+    toc: false
 ---
 
 <style type="text/css">
@@ -14,6 +16,13 @@ body {
   color: #555555; font-family: "Montserrat", sans-serif; font-style: normal; font-weight: 400;
 }
 </style> 
+
+
+# Random forest {.tabset .tabset-fade .tabset-pills .p-3 .border .rounded}  
+
+## Setup {.tabset .tabset-fade .p-3 .rounded} 
+
+
 ```{r, echo = F}
 knitr::opts_chunk$set(echo = T)
 ```
@@ -55,6 +64,11 @@ predictors <- names(df)[!(names(df) %in% c(excl))]
 
 outcomes <- c("post_test_gtp25", "post_test_gtp50", "post_test_gtp75")
 ```
+
+
+
+
+## Baseline model {.tabset .tabset-fade .p-3 .rounded} 
 
 
 ```{r}
@@ -162,6 +176,10 @@ for (o in c(outcomes)) {
 ```{r}
 # assess train/test performance
 df.pred
+
+## Tuned model {.tabset .tabset-fade .p-3 .rounded} 
+
+
 ```{r}
 # hyperparameter tuning (mtry)
 df.tune <- NULL

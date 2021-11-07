@@ -38,7 +38,11 @@ in_csv <- file.path(root, "src", "final", "student.csv")
 # package declarations
 suppressPackageStartupMessages({
   library(assertr)
+  library(caret)
   library(dplyr)
+  library(ggplot2)
+  library(knitr)
+  library(magrittr)
   library(ranger)
   library(readr)
   library(tidyr)

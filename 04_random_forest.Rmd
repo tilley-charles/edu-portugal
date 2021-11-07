@@ -27,7 +27,8 @@ body {
 knitr::opts_chunk$set(echo = T)
 ```
 
-```{r}
+
+```{r, echo = F}
 # directories
 root   <- paste0("C:/Users/", Sys.getenv("USERNAME"), "/Projects/portugal")
 
@@ -66,6 +67,44 @@ outcomes <- c("post_test_gtp25", "post_test_gtp50", "post_test_gtp75")
 ```
 
 
+```{r}
+# function: model performance
+pred_rates
+```
+
+
+```{r}
+# function: train/test table
+tt_table <- function(df) {
+  
+  df %<>%
+    rename(
+      "Set"              = "set",
+      "Outcome"          = "y",
+      "Class prevalence" = "mu",
+      "Accuracy"         = "rf_acc",
+      "Sensitivity"      = "rf_sens",
+      "Specificity"      = "rf_spec",
+      "Precision"        = "rf_prec"
+    )
+  
+  knitr::kable(
+    df %>% arrange(desc(Set), Outcome),
+    valign  = T,
+    digits  = 3,
+    caption = "Train = Portuguese language exam, Test = Math exam",
+  ) %>%
+  kableExtra::pack_rows(
+    index = c("Train" = 3, "Test" = 3)
+  ) %>%
+  kableExtra::kable_styling(
+    position   = "center",
+    full_width = T,
+    bootstrap_options = c("striped", "hover")
+  )
+  
+}
+```
 
 
 ## Baseline model {.tabset .tabset-fade .p-3 .rounded} 
@@ -104,8 +143,6 @@ for (o in c(outcomes)) {
       seed      = seeds[1])
 
   models[[o]] <- rf.fit
-
-  print(rf.fit)
 
   rf.rates <-
     pred_rates(
@@ -148,8 +185,6 @@ for (o in c(outcomes)) {
   # test model
   rf.test <- ranger:::predict.ranger(models[[o]], data = df.est)
 
-  print(rf.test)
-
   rf.rates <-
     pred_rates(
       prediction = as.numeric(as.logical(rf.test$predictions)==T),
@@ -175,7 +210,9 @@ for (o in c(outcomes)) {
 
 ```{r}
 # assess train/test performance
-df.pred
+tt_table(df.pred)
+```
+
 
 ## Tuned model {.tabset .tabset-fade .p-3 .rounded} 
 
@@ -352,3 +389,11 @@ for (o in c(outcomes)) {
     )
 
 }
+```
+
+
+```{r}
+# assess train/test performance
+tt_table(df.pred)
+```
+

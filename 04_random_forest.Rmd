@@ -154,9 +154,175 @@ for (o in c(outcomes)) {
 ```{r}
 # assess train/test performance
 df.pred
+```{r}
+# hyperparameter tuning (mtry)
+df.tune <- NULL
+models  <- list()
 
+tc <- caret::trainControl(method = "repeatedcv", number = 5, repeats = 3, search = "grid")
+  # 5-fold cross-validation, repeated 3x
 
-# TO DO: add visualizations
-# TO DO: vary hyperparameters (especially mtry)
-# TO DO: cross-validated RF approach with only reading exam data
+mtry.base <- floor(sqrt(length(c(predictors))))
+  # baseline mtry = number of predictors considers at each split
+
+tg <- expand.grid(.mtry = floor(mtry.base/2):(mtry.base*3))
+  # tune grid for mtry
+
+for (o in c(outcomes)) {
+
+  # model-specific data frame
+  df.est <-
+    df %>%
+    filter(subj=="por") %>%
+    drop_na(all_of(c(o))) %>%
+    drop_na(all_of(c(predictors))) %>%
+    mutate(!!sym(paste0(o,"_factor")) := as.factor(!!sym(o)==1))
+
+  # train model
+  rf.tune <-
+    caret::train(
+      as.formula(paste(paste0(o, "_factor"), "~", paste0(c(predictors), collapse = " + "))),
+      data       = df.est,
+      metric     = "Accuracy",
+      trControl  = tc,
+      tuneGrid   = tg
+    )
+  
+  models[[o]] <- rf.tune
+  
+  df.tune <-
+    rbind(
+      df.tune,
+      tibble(
+        set    = "tune",
+        y      = o,
+        opt    = as.numeric(rf.tune$bestTune$mtry==rf.tune$results$mtry),
+        mtry   = rf.tune$results$mtry,
+        rf_acc = rf.tune$results$Accuracy
+      )
+    )
+
+}
 ```
+
+
+```{r}
+# visualize results of mtry tuning
+ggplot(
+  df.tune,
+  aes(y     = rf_acc,
+      x     = mtry,
+      color = as.factor(y))) +
+  geom_line() +
+  geom_point(
+    size  = 2,
+    shape = 17) +
+  geom_point(
+    data = df.tune %>% filter(opt==1),
+    aes(y = rf_acc,
+        x = mtry),
+    size  = 5,
+    shape = 19,
+    show.legend = F) +
+  scale_color_manual(
+    values = c("blue", "green", "red")) +
+  labs(y = "Accuracy", x = "mtry") +
+  custom_theme
+```
+
+
+```{r}
+# estimate tuned model on training set
+df.pred <- NULL
+models  <- list()
+
+seeds <- c(295195, 482951, 819514)
+
+for (o in c(outcomes)) {
+
+  # model-specific data frame
+  df.est <-
+    df %>%
+    filter(subj=="por") %>%
+    drop_na(all_of(c(o))) %>%
+    drop_na(all_of(c(predictors))) %>%
+    mutate(!!sym(paste0(o,"_factor")) := as.factor(!!sym(o)==1))
+
+  # baseline accuracy
+  mu <- mean(df.est[[o]])
+
+  # random forest
+  seeds <- seeds[2:length(seeds)]
+
+  rf.fit <-
+    ranger::ranger(
+      as.formula(paste(paste0(o, "_factor"), "~", paste0(c(predictors), collapse = " + "))),
+      data      = df.est,
+      num.trees = 500,
+      mtry      = df.tune %>% filter(y==all_of(o) & opt==1) %>% pull(mtry),
+      replace   = T,
+      seed      = seeds[1])
+
+  models[[o]] <- rf.fit
+
+  rf.rates <-
+    pred_rates(
+      prediction = as.numeric(as.logical(rf.fit$predictions)==T),
+      reference  = as.numeric(as.logical(df.est[[o]])==T))
+
+  df.pred <-
+    rbind(
+      df.pred,
+      tibble(
+         set     = "train",
+         y       = o,
+         mu      = mu,
+         rf_acc  = rf.rates$acc,
+         rf_sens = rf.rates$sens,
+         rf_spec = rf.rates$spec,
+         rf_prec = rf.rates$prec
+      )
+    )
+
+}
+```
+
+
+```{r}
+# use math exam scores as test set
+for (o in c(outcomes)) {
+
+  # model-specific data frame
+  df.est <-
+    df %>%
+    filter(subj=="mat") %>%
+    drop_na(all_of(c(o))) %>%
+    drop_na(all_of(c(predictors))) %>%
+    mutate(!!sym(paste0(o,"_factor")) := as.factor(!!sym(o)==1))
+
+  # baseline accuracy
+  mu <- mean(df.est[[o]])
+
+  # test model
+  rf.test <- ranger:::predict.ranger(models[[o]], data = df.est)
+
+  rf.rates <-
+    pred_rates(
+      prediction = as.numeric(as.logical(rf.test$predictions)==T),
+      reference  = as.numeric(as.logical(df.est[[o]])==T))
+
+  df.pred <-
+    rbind(
+      df.pred,
+      tibble(
+         set     = "test",
+         y       = o,
+         mu      = mu,
+         rf_acc  = rf.rates$acc,
+         rf_sens = rf.rates$sens,
+         rf_spec = rf.rates$spec,
+         rf_prec = rf.rates$prec
+      )
+    )
+
+}

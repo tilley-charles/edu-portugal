@@ -6,6 +6,14 @@ output:
     highlight: tango
 ---
 
+<style type="text/css">
+:is(h1, h2, h3, h4) {
+  color: #0B2949; font-family: "Montserrat", sans-serif; font-style: normal; font-weight: 600;
+} 
+body {
+  color: #555555; font-family: "Montserrat", sans-serif; font-style: normal; font-weight: 400;
+}
+</style> 
 ```{r, echo = F}
 knitr::opts_chunk$set(echo = T)
 ```

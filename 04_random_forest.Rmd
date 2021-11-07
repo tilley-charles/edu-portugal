@@ -111,6 +111,30 @@ tt_table <- function(df) {
 ```
 
 
+```{r, echo = T}
+# custom ggplot theme
+custom_theme <-
+  ggplot2::theme_bw() +
+  ggplot2::theme(
+    axis.title         = element_text(size = 11, colour = "black"),
+    axis.text          = element_text(size = 11, colour = "black"),
+    axis.line          = element_line(colour = "black"),
+    legend.title       = element_blank(),
+    legend.key         = element_rect(size = 6),
+    legend.key.height  = unit(0.5, "cm"),
+    legend.key.width   = unit(1.5, "cm"),
+    legend.position    = "bottom",
+    legend.text        = element_text(size = 10, colour = "black"),
+    plot.caption       = element_text(hjust = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(size = 0.1, color = "gray88"),
+    panel.grid.minor   = element_blank(),
+    panel.border       = element_blank(),
+    panel.background   = element_blank()
+  )
+```
+
+
 ## Baseline model {.tabset .tabset-fade .p-3 .rounded} 
 
 
